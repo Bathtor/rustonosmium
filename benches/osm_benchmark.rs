@@ -1,9 +1,7 @@
 use criterion::{black_box, criterion_group, criterion_main, Bencher, Criterion, SamplingMode, Throughput};
 
-use rustonosmium::databases::*;
-use rustonosmium::osm_data::*;
-use uom::si::f64::*;
-use uom::si::length::kilometer;
+use rustonosmium::{databases::*, osm_data::*};
+use uom::si::{f64::*, length::kilometer};
 
 const TEST_OSM_FILE: &str = "/Users/lkroll/Programming/Sailing/test-data/world.osm";
 

@@ -1,6 +1,10 @@
 //use rustc_hash::FxHashMap;
+use geographiclib_rs::{Geodesic, InverseGeodesic};
 use std::{num::ParseIntError, str::FromStr};
-use uom::si::{f64::*, length::kilometer};
+use uom::si::{
+    f64::*,
+    length::{kilometer, meter},
+};
 
 // <node id="106904" lat="51.5195553" lon="-0.0362329" version="5" timestamp="2020-06-15T19:23:35Z" changeset="86684855" uid="4948143" user="doublah">
 //     <tag k="seamark:type" v="gate"/>
@@ -88,6 +92,18 @@ impl Position {
         let dist_km = central_angle * Self::EARTH_RADIUS_KM;
         Length::new::<kilometer>(dist_km)
     }
+
+    pub fn distance_accurate(&self, other: &Self) -> Length {
+        let self_lat_deg = self.lat.as_degrees();
+        let self_lon_deg = self.lon.as_degrees();
+        let other_lat_deg = other.lat.as_degrees();
+        let other_lon_deg = other.lon.as_degrees();
+
+        let g = Geodesic::wgs84();
+        let dist_m: f64 = g.inverse(self_lat_deg, self_lon_deg, other_lat_deg, other_lon_deg);
+
+        Length::new::<meter>(dist_m)
+    }
 }
 
 impl FromStr for Position {
@@ -125,7 +141,15 @@ impl Latitude {
         if let Latitude::Float(n) = self.to_float() {
             n * std::f64::consts::PI / 180.0
         } else {
-            panic!("Must be a Float instance now!");
+            unreachable!("Must be a Float instance now!");
+        }
+    }
+
+    pub fn as_degrees(&self) -> f64 {
+        if let Latitude::Float(n) = self.to_float() {
+            n
+        } else {
+            unreachable!("Must be a Float instance now!");
         }
     }
 }
@@ -166,6 +190,14 @@ impl Longitude {
             n * std::f64::consts::PI / 180.0
         } else {
             panic!("Must be a Float instance now!");
+        }
+    }
+
+    pub fn as_degrees(&self) -> f64 {
+        if let Longitude::Float(n) = self.to_float() {
+            n
+        } else {
+            unreachable!("Must be a Float instance now!");
         }
     }
 }

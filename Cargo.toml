@@ -7,10 +7,11 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-xml-rs 		= "0.8"
-quick-xml 	= "0.20"
-rustc-hash	= "1.1"
-uom 		= "0.30"
+xml-rs 				= "0.8"
+quick-xml 			= "0.20"
+rustc-hash			= "1.1"
+uom 				= "0.30"
+geographiclib-rs	= "0.2.0"
 
 [dev-dependencies]
 criterion = "0.3"

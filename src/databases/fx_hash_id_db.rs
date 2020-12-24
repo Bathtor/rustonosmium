@@ -3,6 +3,8 @@ use crate::ScanError;
 use rustc_hash::FxHashMap;
 use std::path::Path;
 
+use uom::si::{f64::*, length::kilometer};
+
 pub fn from_file<P>(path: P) -> Result<FxHashIdDb, ScanError>
 where
     P: AsRef<Path>,
@@ -28,9 +30,13 @@ impl OsmDatabase for FxHashIdDb {
     }
 
     fn nodes_in_radius(&self, pos: Position, radius: Length) -> Vec<&Node> {
+        let radius_km = radius.get::<kilometer>();
+        let error_radius_km = radius_km * 1.1;
+        let error_radius = Length::new::<kilometer>(error_radius_km);
         self.nodes
             .values()
-            .filter(|n| n.position().distance_approximate(&pos) < radius)
+            .filter(|n| n.position().distance_approximate(&pos) < error_radius)
+            .filter(|n| n.position().distance_accurate(&pos) < radius)
             .collect()
     }
 
