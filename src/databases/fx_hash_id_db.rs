@@ -60,3 +60,20 @@ impl OsmDatabase for FxHashIdDb {
         self.nodes.values().collect()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_filter_tags() {
+        let db = from_file(crate::tests::TEST_OSM_FILE).expect("load db");
+        crate::tests::test_filter_tags(db);
+    }
+
+    #[test]
+    fn test_nodes_in_distance() {
+        let db = from_file(crate::tests::TEST_OSM_FILE).expect("load db");
+        crate::tests::test_nodes_in_distance(db);
+    }
+}

@@ -1,10 +1,13 @@
+#![feature(associated_type_defaults)]
+#![allow(clippy::type_complexity)]
 use std::{error::Error, fmt, fs::File, io::BufReader, path::Path};
 
 pub mod databases;
+pub mod geometry;
 pub mod osm_data;
 pub mod quick_xml_reader;
 pub mod xml_rs_reader;
-pub use databases::OsmDatabase;
+pub use databases::{OsmDatabase, OwnedOsmDatabase};
 
 const BUFFER_SIZE: usize = 80 * 1024 * 1024; // 80 MB
 
@@ -60,23 +63,25 @@ impl From<std::num::ParseIntError> for ScanError {
 mod tests {
     use super::*;
 
+    use osm_data::Position;
     use std::time::Instant;
+    use uom::si::{f64::*, length::kilometer};
 
-    const TEST_OSM_FILE: &str = "/Users/lkroll/Programming/Sailing/test-data/world.osm";
+    pub const TEST_OSM_FILE: &str = "/Users/lkroll/Programming/Sailing/test-data/world.osm";
 
-    #[test]
-    fn test_scan_nodes_xml_rs() {
-        let total = xml_rs_reader::scan_nodes(
-            TEST_OSM_FILE,
-            |_node, acc| {
-                //println!("Node: {:?}", _node);
-                acc + 1
-            },
-            0,
-        )
-        .expect("scanned");
-        assert_eq!(1346516, total);
-    }
+    // #[test]
+    // fn test_scan_nodes_xml_rs() {
+    //     let total = xml_rs_reader::scan_nodes(
+    //         TEST_OSM_FILE,
+    //         |_node, acc| {
+    //             //println!("Node: {:?}", _node);
+    //             acc + 1
+    //         },
+    //         0,
+    //     )
+    //     .expect("scanned");
+    //     assert_eq!(1346516, total);
+    // }
 
     #[test]
     fn test_scan_nodes_quick_xml() {
@@ -92,43 +97,27 @@ mod tests {
         assert_eq!(1346516, total);
     }
 
-    #[test]
-    fn test_filter_tags_fx_hash_id_db() {
-        let db = databases::fx_hash_id_db::from_file(TEST_OSM_FILE).expect("load db");
-        let start = Instant::now();
-        test_filter_tags(db);
-        let elap = start.elapsed();
-        println!("elapsed: {}ms", elap.as_millis());
-    }
-
-    fn test_filter_tags(db: impl OsmDatabase) {
+    pub fn test_filter_tags(db: impl OsmDatabase) {
         let res = db.nodes_with_tag("seamark:type", Some("light_minor"));
         assert_eq!(20762, res.len());
     }
 
-    // #[test]
-    // fn test_all_in_memory() {
-    //     let mut nodes: FxHashMap<i64, osm_data::Node> = FxHashMap::default();
-    //     quick_xml_reader::scan_nodes(
-    //         TEST_OSM_FILE,
-    //         |node, _acc| {
-    //             //println!("Node: {:?}", _node);
-    //             nodes.insert(node.id, node);
-    //         },
-    //         (),
-    //     )
-    //     .expect("scanned");
-    //     assert_eq!(1346516, nodes.len());
-    //     let mem_size = std::mem::size_of::<osm_data::Node>();
-    //     println!(
-    //         "Size of a node: {} (* 1346516 = {})",
-    //         mem_size,
-    //         mem_size * 1346516
-    //     );
-    //     loop {
-    //         println!("Size of nodes: {}", std::mem::size_of_val(&nodes));
-    //         std::thread::sleep(std::time::Duration::from_millis(1000));
-    //         //nodes.pop().expect("node");
-    //     }
-    // }
+    pub fn test_filter_tags_owned(db: impl OwnedOsmDatabase) {
+        let res = db.nodes_with_tag("seamark:type", Some("light_minor"));
+        assert_eq!(20762, res.len());
+    }
+
+    pub fn test_nodes_in_distance(db: impl OsmDatabase) {
+        let pos: Position = "(54.5, -8.3)".parse().expect("pos");
+        let dist = Length::new::<kilometer>(100.0);
+        let nodes = db.nodes_in_radius(pos, dist);
+        assert_eq!(540, nodes.len());
+    }
+
+    pub fn test_nodes_in_distance_owned(db: impl OwnedOsmDatabase) {
+        let pos: Position = "(54.5, -8.3)".parse().expect("pos");
+        let dist = Length::new::<kilometer>(100.0);
+        let nodes = db.nodes_in_radius(pos, dist);
+        assert_eq!(540, nodes.len());
+    }
 }
