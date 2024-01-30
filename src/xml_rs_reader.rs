@@ -28,7 +28,10 @@ where
                     acc = scan_osm(&mut parser, &mut scanner, acc)?;
                 }
                 _ => {
-                    return Err(ScanError::Other(format!("An unexpected start element: {:?}", name)));
+                    return Err(ScanError::Other(format!(
+                        "An unexpected start element: {:?}",
+                        name
+                    )));
                 }
             },
             XmlEvent::StartDocument { .. } => continue,
@@ -36,13 +39,20 @@ where
             XmlEvent::Whitespace(_) => continue,
             XmlEvent::Characters(_) => continue,
             _ => {
-                return Err(ScanError::Other(format!("An unexpected xml event: {:?}", event)));
+                return Err(ScanError::Other(format!(
+                    "An unexpected xml event: {:?}",
+                    event
+                )));
             }
         }
     }
 }
 
-fn scan_osm<R, F, T>(parser: &mut EventReader<R>, scanner: &mut F, initial: T) -> Result<T, ScanError>
+fn scan_osm<R, F, T>(
+    parser: &mut EventReader<R>,
+    scanner: &mut F,
+    initial: T,
+) -> Result<T, ScanError>
 where
     R: std::io::Read,
     F: FnMut(Node, T) -> T,
@@ -51,33 +61,47 @@ where
     loop {
         let event = parser.next()?;
         match event {
-            XmlEvent::StartElement { name, attributes, .. } => match name.local_name.as_ref() {
+            XmlEvent::StartElement {
+                name, attributes, ..
+            } => match name.local_name.as_ref() {
                 "node" => {
                     let node = read_node(parser, &attributes)?;
                     acc = scanner(node, acc);
                 }
                 "note" | "meta" | "way" | "relation" => skip_element(parser, name)?,
                 _ => {
-                    return Err(ScanError::Other(format!("An unexpected start element: {:?}", name)));
+                    return Err(ScanError::Other(format!(
+                        "An unexpected start element: {:?}",
+                        name
+                    )));
                 }
             },
             XmlEvent::EndElement { name } => {
                 if name.local_name == "osm" {
                     return Ok(acc);
                 } else {
-                    return Err(ScanError::Other(format!("Unexpected end element: {:?}", name)));
+                    return Err(ScanError::Other(format!(
+                        "Unexpected end element: {:?}",
+                        name
+                    )));
                 }
             }
             XmlEvent::Whitespace(_) => continue,
             XmlEvent::Characters(_) => continue,
             _ => {
-                return Err(ScanError::Other(format!("An unexpected xml event: {:?}", event)));
+                return Err(ScanError::Other(format!(
+                    "An unexpected xml event: {:?}",
+                    event
+                )));
             }
         }
     }
 }
 
-fn read_node<R: std::io::Read>(parser: &mut EventReader<R>, attributes: &[OwnedAttribute]) -> Result<Node, ScanError> {
+fn read_node<R: std::io::Read>(
+    parser: &mut EventReader<R>,
+    attributes: &[OwnedAttribute],
+) -> Result<Node, ScanError> {
     let mut node = Node::uninitialised();
     for a in attributes {
         match a.name.local_name.as_ref() {
@@ -99,12 +123,17 @@ fn read_node<R: std::io::Read>(parser: &mut EventReader<R>, attributes: &[OwnedA
     loop {
         let event = parser.next()?;
         match event {
-            XmlEvent::StartElement { name, attributes, .. } => {
+            XmlEvent::StartElement {
+                name, attributes, ..
+            } => {
                 if name.local_name == "tag" {
                     let tag = read_tag(attributes)?;
                     node.tags.push(tag);
                 } else {
-                    return Err(ScanError::Other(format!("A none-tag start element: {:?}", name)));
+                    return Err(ScanError::Other(format!(
+                        "A none-tag start element: {:?}",
+                        name
+                    )));
                     //panic!("A none-tag start element: {:?}", name);
                 }
             }
@@ -112,13 +141,19 @@ fn read_node<R: std::io::Read>(parser: &mut EventReader<R>, attributes: &[OwnedA
                 "node" => return Ok(node),
                 "tag" => continue,
                 _ => {
-                    return Err(ScanError::Other(format!("A none-node end element: {:?}", name)));
+                    return Err(ScanError::Other(format!(
+                        "A none-node end element: {:?}",
+                        name
+                    )));
                     //panic!("A none-node end element: {:?}", name)
                 }
             },
             XmlEvent::Whitespace(_) => continue,
             _ => {
-                return Err(ScanError::Other(format!("An unexpected xml event: {:?}", event)));
+                return Err(ScanError::Other(format!(
+                    "An unexpected xml event: {:?}",
+                    event
+                )));
                 //panic!("An unexpected xml event: {:?}", name);
             }
         }
@@ -144,7 +179,10 @@ fn read_tag(attributes: Vec<OwnedAttribute>) -> Result<Tag, ScanError> {
     Ok(Tag { key, value })
 }
 
-fn skip_element<R: std::io::Read>(parser: &mut EventReader<R>, element_name: OwnedName) -> Result<(), ScanError> {
+fn skip_element<R: std::io::Read>(
+    parser: &mut EventReader<R>,
+    element_name: OwnedName,
+) -> Result<(), ScanError> {
     loop {
         let event = parser.next()?;
         match event {

@@ -142,9 +142,11 @@ impl Intersecting<Rectangle> for BoundingBox {
         match self {
             BoundingBox::Simple(r) => r.intersects(other),
             BoundingBox::EquatorialWrap(r) => {
-                let y_overlap = r.low_corner.y <= other.high_corner.y && other.low_corner.y <= r.high_corner.y;
+                let y_overlap =
+                    r.low_corner.y <= other.high_corner.y && other.low_corner.y <= r.high_corner.y;
                 // other can't wrap, so one sided tests are sufficient
-                let x_overlap = r.low_corner.x <= other.high_corner.x || other.low_corner.x <= r.high_corner.x;
+                let x_overlap =
+                    r.low_corner.x <= other.high_corner.x || other.low_corner.x <= r.high_corner.x;
 
                 x_overlap && y_overlap
             }
@@ -161,9 +163,11 @@ impl Intersecting<Rectangle> for BoundingBox {
         match self {
             BoundingBox::Simple(r) => r.contains(other),
             BoundingBox::EquatorialWrap(r) => {
-                let y_contain = r.low_corner.y <= other.low_corner.y && other.high_corner.y <= r.high_corner.y;
+                let y_contain =
+                    r.low_corner.y <= other.low_corner.y && other.high_corner.y <= r.high_corner.y;
                 // other can't wrap, so one sided tests are sufficient
-                let x_contain = r.low_corner.x <= other.low_corner.x || other.high_corner.x <= r.high_corner.x;
+                let x_contain =
+                    r.low_corner.x <= other.low_corner.x || other.high_corner.x <= r.high_corner.x;
 
                 x_contain && y_contain
             }

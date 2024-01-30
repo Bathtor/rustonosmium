@@ -88,8 +88,8 @@ impl Position {
         let sin_phi_1 = self_lat_rad.sin();
         let sin_phi_2 = other_lat_rad.sin();
         let cos_dlon = dlon.cos();
-        let upper =
-            (cos_phi_2 * dlon.sin()).powi(2) + (cos_phi_1 * sin_phi_2 - sin_phi_1 * cos_phi_2 * cos_dlon).powi(2);
+        let upper = (cos_phi_2 * dlon.sin()).powi(2)
+            + (cos_phi_1 * sin_phi_2 - sin_phi_1 * cos_phi_2 * cos_dlon).powi(2);
         let lower = sin_phi_1 * sin_phi_2 + cos_phi_1 * cos_phi_2 * cos_dlon;
         let central_angle = upper.sqrt().atan2(lower);
         let dist_km = central_angle * Self::EARTH_RADIUS_KM;
@@ -165,7 +165,10 @@ impl FromStr for Position {
     type Err = ParseIntError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let coords: Vec<&str> = s.trim_matches(|p| p == '(' || p == ')').split(',').collect();
+        let coords: Vec<&str> = s
+            .trim_matches(|p| p == '(' || p == ')')
+            .split(',')
+            .collect();
 
         let lat: Latitude = coords[0].trim().parse()?;
         let lon: Longitude = coords[1].trim().parse()?;
@@ -217,7 +220,9 @@ impl Latitude {
 
     pub fn to_float(self) -> Self {
         match self {
-            Latitude::Decimal(deg, frac) => Latitude::Float((deg as f64) + (frac as f64) / PRECISITION_FACTOR),
+            Latitude::Decimal(deg, frac) => {
+                Latitude::Float((deg as f64) + (frac as f64) / PRECISITION_FACTOR)
+            }
             Latitude::Tight(mult) => Latitude::Float((mult as f64) / PRECISITION_FACTOR),
             Latitude::Float(_) => self,
         }
@@ -242,7 +247,9 @@ impl Latitude {
 
     pub fn to_tight(self) -> Self {
         match self {
-            Latitude::Decimal(deg, frac) => Latitude::Tight((deg as i32) * (PRECISITION_FACTOR as i32) + (frac as i32)),
+            Latitude::Decimal(deg, frac) => {
+                Latitude::Tight((deg as i32) * (PRECISITION_FACTOR as i32) + (frac as i32))
+            }
             Latitude::Tight(mult) => self,
             Latitude::Float(f) => Latitude::Tight((f * PRECISITION_FACTOR).round() as i32),
         }
@@ -337,7 +344,10 @@ impl AbsDiffEq for Latitude {
     }
 
     fn abs_diff_eq(&self, other: &Self, epsilon: Self::Epsilon) -> bool {
-        assert!(epsilon < 1.0 && 0.0 < epsilon, "Only use this with fractional epsilon!");
+        assert!(
+            epsilon < 1.0 && 0.0 < epsilon,
+            "Only use this with fractional epsilon!"
+        );
         match self {
             Latitude::Float(f1) => {
                 if let Latitude::Float(f2) = other.to_float() {
@@ -402,7 +412,9 @@ impl Longitude {
 
     pub fn to_float(self) -> Self {
         match self {
-            Longitude::Decimal(deg, frac) => Longitude::Float((deg as f64) + (frac as f64) / PRECISITION_FACTOR),
+            Longitude::Decimal(deg, frac) => {
+                Longitude::Float((deg as f64) + (frac as f64) / PRECISITION_FACTOR)
+            }
             Longitude::Tight(mult) => Longitude::Float((mult as f64) / PRECISITION_FACTOR),
             Longitude::Float(_) => self,
         }
@@ -524,7 +536,10 @@ impl AbsDiffEq for Longitude {
     }
 
     fn abs_diff_eq(&self, other: &Self, epsilon: Self::Epsilon) -> bool {
-        assert!(epsilon < 1.0 && 0.0 < epsilon, "Only use this with fractional epsilon!");
+        assert!(
+            epsilon < 1.0 && 0.0 < epsilon,
+            "Only use this with fractional epsilon!"
+        );
         match self {
             Longitude::Float(f1) => {
                 if let Longitude::Float(f2) = other.to_float() {

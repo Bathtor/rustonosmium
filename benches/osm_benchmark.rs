@@ -1,4 +1,12 @@
-use criterion::{black_box, criterion_group, criterion_main, Bencher, Criterion, SamplingMode, Throughput};
+use criterion::{
+    black_box,
+    criterion_group,
+    criterion_main,
+    Bencher,
+    Criterion,
+    SamplingMode,
+    Throughput,
+};
 
 use rustonosmium::{databases::*, osm_data::*};
 use uom::si::{f64::*, length::kilometer};
@@ -60,7 +68,9 @@ fn count_nodes_benchmark(c: &mut Criterion, databases: &DBSet) {
     group.bench_function("quick_xml", |b| {
         b.iter(bench_count_nodes_quick_xml);
     });
-    group.bench_function("in-memory", |b| bench_count_nodes_in_memory(b, &databases.fx_db));
+    group.bench_function("in-memory", |b| {
+        bench_count_nodes_in_memory(b, &databases.fx_db)
+    });
     group.finish();
 }
 
@@ -68,8 +78,12 @@ fn filter_tags_benchmark(c: &mut Criterion, databases: &DBSet) {
     let mut group = c.benchmark_group("FilterTags");
     group.throughput(Throughput::Elements(databases.fx_db.nodes().len() as u64));
     group.bench_function("fx_hash_id_db", |b| bench_filter_tags(b, &databases.fx_db));
-    group.bench_function("rtree_indexed_db", |b| bench_filter_tags(b, &databases.index_db));
-    group.bench_function("temp_disk_db", |b| bench_filter_tags_owned(b, &databases.disk_db));
+    group.bench_function("rtree_indexed_db", |b| {
+        bench_filter_tags(b, &databases.index_db)
+    });
+    group.bench_function("temp_disk_db", |b| {
+        bench_filter_tags_owned(b, &databases.disk_db)
+    });
     group.bench_function("rtree_indexed_disk_db", |b| {
         bench_filter_tags_owned(b, &databases.index_disk_db)
     });
@@ -80,8 +94,12 @@ fn distance_benchmark(c: &mut Criterion, databases: &DBSet) {
     let mut group = c.benchmark_group("Distance");
     group.throughput(Throughput::Elements(databases.fx_db.nodes().len() as u64));
     group.bench_function("fx_hash_id_db", |b| bench_distance(b, &databases.fx_db));
-    group.bench_function("rtree_indexed_db", |b| bench_distance(b, &databases.index_db));
-    group.bench_function("temp_disk_db", |b| bench_distance_owned(b, &databases.disk_db));
+    group.bench_function("rtree_indexed_db", |b| {
+        bench_distance(b, &databases.index_db)
+    });
+    group.bench_function("temp_disk_db", |b| {
+        bench_distance_owned(b, &databases.disk_db)
+    });
     group.bench_function("rtree_indexed_disk_db", |b| {
         bench_distance_owned(b, &databases.index_disk_db)
     });

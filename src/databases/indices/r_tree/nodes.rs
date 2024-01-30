@@ -245,7 +245,10 @@ where
         let mut nodes: Vec<ChildEntry> = Vec::with_capacity(1);
         let mut mut_node = node.node.as_internal_mut();
         mut_node.take_children(&mut nodes);
-        nodes.push(ChildEntry(new_child.node.calculate_bounding_box(), new_child.id));
+        nodes.push(ChildEntry(
+            new_child.node.calculate_bounding_box(),
+            new_child.id,
+        ));
         let (left, right) = Rectangle::find_split(nodes, MIN_FILL, NODE_WIDTH);
         mut_node.set_children(left);
         for ChildEntry(_, id) in mut_node.filled_entries() {
@@ -422,7 +425,11 @@ impl<V> Leaf<V> {
         }
     }
 
-    pub(super) fn with(parent: Option<NodeId>, len: usize, entries: [Option<V>; NODE_WIDTH]) -> Self {
+    pub(super) fn with(
+        parent: Option<NodeId>,
+        len: usize,
+        entries: [Option<V>; NODE_WIDTH],
+    ) -> Self {
         Leaf {
             dirty: false,
             parent,
@@ -432,7 +439,9 @@ impl<V> Leaf<V> {
     }
 
     pub(super) fn filled_entries(&self) -> impl Iterator<Item = &V> {
-        self.entries[0..self.len].iter().map(|o| o.as_ref().unwrap())
+        self.entries[0..self.len]
+            .iter()
+            .map(|o| o.as_ref().unwrap())
     }
 
     fn is_root(&self) -> bool {
@@ -539,7 +548,11 @@ impl InternalNode {
         }
     }
 
-    pub(super) fn with(parent: Option<NodeId>, len: usize, entries: [Option<ChildEntry>; NODE_WIDTH]) -> Self {
+    pub(super) fn with(
+        parent: Option<NodeId>,
+        len: usize,
+        entries: [Option<ChildEntry>; NODE_WIDTH],
+    ) -> Self {
         InternalNode {
             dirty: false,
             parent,
@@ -549,7 +562,9 @@ impl InternalNode {
     }
 
     pub(super) fn filled_entries(&self) -> impl Iterator<Item = &ChildEntry> {
-        self.entries[0..self.len].iter().map(|o| o.as_ref().unwrap())
+        self.entries[0..self.len]
+            .iter()
+            .map(|o| o.as_ref().unwrap())
     }
 
     fn is_root(&self) -> bool {
@@ -635,10 +650,13 @@ impl InternalNode {
     where
         V: Extending<Rectangle>,
     {
-        let mut current: &ChildEntry = &self.entries[0].expect("Don't invoke best_fit on an uninitialised node");
+        let mut current: &ChildEntry =
+            &self.entries[0].expect("Don't invoke best_fit on an uninitialised node");
         let mut current_enlargement = value.extend_area(current.0);
         for entry_opt in self.entries[1..self.len].iter() {
-            let entry = entry_opt.as_ref().expect("All entries < len should be Some!");
+            let entry = entry_opt
+                .as_ref()
+                .expect("All entries < len should be Some!");
             let entry_enlargement = value.extend_area(entry.0);
             match current_enlargement.partial_cmp(&entry_enlargement) {
                 Some(Ordering::Less) | None => continue,

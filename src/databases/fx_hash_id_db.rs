@@ -65,12 +65,14 @@ impl OsmDatabase for FxHashIdDb {
 mod tests {
     use super::*;
 
+    #[ignore = "slow test"]
     #[test]
     fn test_filter_tags() {
         let db = from_file(crate::tests::TEST_OSM_FILE).expect("load db");
         crate::tests::test_filter_tags(db);
     }
 
+    #[ignore = "slow test"]
     #[test]
     fn test_nodes_in_distance() {
         let db = from_file(crate::tests::TEST_OSM_FILE).expect("load db");

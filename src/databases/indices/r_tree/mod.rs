@@ -48,7 +48,11 @@ mod tests {
         {
             tree.insert(Point { x: 2.0, y: -2.0 });
             // gotta filter after, since search will return all entries in the same leaf
-            let res: Vec<Point> = tree.search(&unit_rec).into_iter().filter(|e| e == &centre).collect();
+            let res: Vec<Point> = tree
+                .search(&unit_rec)
+                .into_iter()
+                .filter(|e| e == &centre)
+                .collect();
             assert_eq!(1, res.len());
             assert_eq!(centre, res[0]);
         }

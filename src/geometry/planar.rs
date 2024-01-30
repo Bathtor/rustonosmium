@@ -99,7 +99,10 @@ impl Extending<Rectangle> for Point {
             let high_y = (geometry.high_corner.y).max(self.y);
             let r = Rectangle {
                 low_corner: Point { x: low_x, y: low_y },
-                high_corner: Point { x: high_x, y: high_y },
+                high_corner: Point {
+                    x: high_x,
+                    y: high_y,
+                },
             };
             if cfg!(test) {
                 r.assert_legal();
@@ -160,13 +163,17 @@ impl Bounding for Point {
             x_sorted.sort_by(|l_entry, r_entry| {
                 let l: &Point = l_entry.1.as_ref();
                 let r: &Point = r_entry.1.as_ref();
-                (l.x).partial_cmp(&r.x).expect("All coordinates must be comparable!")
+                (l.x)
+                    .partial_cmp(&r.x)
+                    .expect("All coordinates must be comparable!")
             });
             let mut y_sorted = x_sorted.clone();
             y_sorted.sort_by(|l_entry, r_entry| {
                 let l: &Point = l_entry.1.as_ref();
                 let r: &Point = r_entry.1.as_ref();
-                (l.y).partial_cmp(&r.y).expect("All coordinates must be comparable!")
+                (l.y)
+                    .partial_cmp(&r.y)
+                    .expect("All coordinates must be comparable!")
             });
             choose_split_axis(x_sorted, y_sorted, min_fill, max_fill)
         };
@@ -185,11 +192,16 @@ pub struct Rectangle {
 
 impl Rectangle {
     pub fn margin_length(&self) -> f64 {
-        (self.high_corner.x - self.low_corner.x).abs() * (self.high_corner.y - self.low_corner.y).abs()
+        (self.high_corner.x - self.low_corner.x).abs()
+            * (self.high_corner.y - self.low_corner.y).abs()
     }
 
     pub fn assert_legal(&self) {
-        assert!(self.low_corner <= self.high_corner, "Rectangle {} is illegal!", self);
+        assert!(
+            self.low_corner <= self.high_corner,
+            "Rectangle {} is illegal!",
+            self
+        );
     }
 }
 
@@ -238,7 +250,10 @@ impl Intersecting for Rectangle {
         if (low_x < high_x) && (low_y < high_y) {
             let r = Rectangle {
                 low_corner: Point { x: low_x, y: low_y },
-                high_corner: Point { x: high_x, y: high_y },
+                high_corner: Point {
+                    x: high_x,
+                    y: high_y,
+                },
             };
             if cfg!(test) {
                 r.assert_legal();
@@ -257,7 +272,8 @@ impl Intersecting for Rectangle {
 
 impl HasArea for Rectangle {
     fn area(&self) -> f64 {
-        (self.high_corner.x - self.low_corner.x).abs() * (self.high_corner.y - self.low_corner.y).abs()
+        (self.high_corner.x - self.low_corner.x).abs()
+            * (self.high_corner.y - self.low_corner.y).abs()
     }
 }
 
@@ -343,7 +359,11 @@ impl Bounding for Rectangle {
     }
 }
 
-fn bounding_distributions<T, B>(sorted: &[(usize, &T)], min_fill: usize, max_fill: usize) -> Vec<(Rectangle, Rectangle)>
+fn bounding_distributions<T, B>(
+    sorted: &[(usize, &T)],
+    min_fill: usize,
+    max_fill: usize,
+) -> Vec<(Rectangle, Rectangle)>
 where
     T: AsRef<B>,
     B: Bounding,
@@ -352,8 +372,10 @@ where
     let mut result = Vec::with_capacity(num_distributions);
     for k in 1..=num_distributions {
         let split_index = min_fill - 1 + k;
-        let left_bounding_box = B::bound_all(sorted[0..split_index].iter().map(|entry| entry.1.as_ref()));
-        let right_bounding_box = B::bound_all(sorted[split_index..].iter().map(|entry| entry.1.as_ref()));
+        let left_bounding_box =
+            B::bound_all(sorted[0..split_index].iter().map(|entry| entry.1.as_ref()));
+        let right_bounding_box =
+            B::bound_all(sorted[split_index..].iter().map(|entry| entry.1.as_ref()));
         result.push((left_bounding_box, right_bounding_box));
     }
     result
@@ -369,8 +391,10 @@ where
     T: AsRef<B>,
     B: Bounding,
 {
-    let x_distributions: Vec<(Rectangle, Rectangle)> = bounding_distributions(x_sorted.as_slice(), min_fill, max_fill);
-    let y_distributions: Vec<(Rectangle, Rectangle)> = bounding_distributions(y_sorted.as_slice(), min_fill, max_fill);
+    let x_distributions: Vec<(Rectangle, Rectangle)> =
+        bounding_distributions(x_sorted.as_slice(), min_fill, max_fill);
+    let y_distributions: Vec<(Rectangle, Rectangle)> =
+        bounding_distributions(y_sorted.as_slice(), min_fill, max_fill);
     let margin_x_sum: f64 = x_distributions
         .iter()
         .map(|(l, r)| l.margin_length() + r.margin_length())
@@ -424,7 +448,11 @@ fn choose_split_index(chosen_distributions: Vec<(Rectangle, Rectangle)>, min_fil
     // split index
     min_fill - 1 + k
 }
-fn split_at_index<T>(entries: Vec<T>, chosen_sorted_indices: Vec<usize>, split_index: usize) -> (Vec<T>, Vec<T>) {
+fn split_at_index<T>(
+    entries: Vec<T>,
+    chosen_sorted_indices: Vec<usize>,
+    split_index: usize,
+) -> (Vec<T>, Vec<T>) {
     let mut pickable_entries: Vec<Option<T>> = entries.into_iter().map(Some).collect();
     let mut left: Vec<T> = Vec::with_capacity(split_index);
     for index in chosen_sorted_indices[0..split_index].iter() {

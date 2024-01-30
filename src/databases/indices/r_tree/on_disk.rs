@@ -77,7 +77,10 @@ impl FixedSizeSerde for ChildEntry {
         let low_corner = Point { x: low_x, y: low_y };
         let high_x = buf.get_f64();
         let high_y = buf.get_f64();
-        let high_corner = Point { x: high_x, y: high_y };
+        let high_corner = Point {
+            x: high_x,
+            y: high_y,
+        };
         let bounding_box = Rectangle {
             low_corner,
             high_corner,
@@ -152,7 +155,9 @@ where
 
     fn create_file(size: u64) -> MmapMut {
         let node_file = tempfile().expect("Could not create temporary file for nodes");
-        node_file.set_len(size).expect("Could not set file length for nodes");
+        node_file
+            .set_len(size)
+            .expect("Could not set file length for nodes");
         unsafe {
             MmapOptions::new()
                 .map_mut(&node_file)
@@ -175,7 +180,9 @@ where
                 .pop_lru()
                 .expect("should be something in there if it's full");
             if uncached.1.is_dirty() {
-                mut_cache_data.must_flush.push(uncached.1.with_id(uncached.0));
+                mut_cache_data
+                    .must_flush
+                    .push(uncached.1.with_id(uncached.0));
             }
         }
         mut_cache_data.cache.put(node.id, node.node);
@@ -260,13 +267,24 @@ where
 {
     fn get(&self, id: NodeId) -> NodeRef<V> {
         if id < self.num_nodes {
-            let cache_res: Option<NodeRef<V>> = { self.cache_data.borrow_mut().cache.get(&id).cloned() };
+            let cache_res: Option<NodeRef<V>> =
+                { self.cache_data.borrow_mut().cache.get(&id).cloned() };
             if let Some(node) = cache_res {
                 node
             } else {
-                let pos_res = { self.cache_data.borrow().must_flush.iter().position(|n| n.id == id) };
+                let pos_res = {
+                    self.cache_data
+                        .borrow()
+                        .must_flush
+                        .iter()
+                        .position(|n| n.id == id)
+                };
                 if let Some(position) = pos_res {
-                    let id_node = self.cache_data.borrow_mut().must_flush.swap_remove(position);
+                    let id_node = self
+                        .cache_data
+                        .borrow_mut()
+                        .must_flush
+                        .swap_remove(position);
                     self.cache_node(id_node.clone());
                     id_node.node
                 } else {

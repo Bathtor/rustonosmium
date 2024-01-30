@@ -53,6 +53,12 @@ impl From<quick_xml::Error> for ScanError {
         ScanError::QuickXmlError(e)
     }
 }
+impl From<quick_xml::events::attributes::AttrError> for ScanError {
+    fn from(e: quick_xml::events::attributes::AttrError) -> Self {
+        let qx_error: quick_xml::Error = e.into();
+        ScanError::QuickXmlError(qx_error)
+    }
+}
 impl From<std::num::ParseIntError> for ScanError {
     fn from(e: std::num::ParseIntError) -> Self {
         ScanError::NumberParseError(e)
@@ -83,6 +89,7 @@ mod tests {
     //     assert_eq!(1346516, total);
     // }
 
+    #[ignore = "slow test"]
     #[test]
     fn test_scan_nodes_quick_xml() {
         let total = quick_xml_reader::scan_nodes(

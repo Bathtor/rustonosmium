@@ -39,7 +39,10 @@ impl<V> InMemoryNodeManager<V> {
 
 impl<V> NodeManager<V> for InMemoryNodeManager<V> {
     fn get(&self, id: NodeId) -> NodeRef<V> {
-        let res: &NodeRef<V> = self.nodes.get(id).expect("Never ask for node ids that don't exist!");
+        let res: &NodeRef<V> = self
+            .nodes
+            .get(id)
+            .expect("Never ask for node ids that don't exist!");
         let node: NodeRef<V> = Clone::clone(res);
         node
     }

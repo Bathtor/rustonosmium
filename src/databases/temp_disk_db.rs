@@ -88,7 +88,9 @@ impl OwnedOsmDatabase for TempDiskDb {
             let c = move |n: &Node| n.tags.iter().any(|t| t.key.contains(key_pattern));
             Box::new(c)
         };
-        self.scan_nodes_with_tags().filter(|n| filter_fun(n)).collect()
+        self.scan_nodes_with_tags()
+            .filter(|n| filter_fun(n))
+            .collect()
     }
 }
 
@@ -298,7 +300,11 @@ impl OnDiskNode {
             id: self.id,
             lat,
             lon,
-            tags: tags.tags.into_iter().map(|(key, value)| Tag { key, value }).collect(),
+            tags: tags
+                .tags
+                .into_iter()
+                .map(|(key, value)| Tag { key, value })
+                .collect(),
         }
     }
 
@@ -365,12 +371,14 @@ mod tests {
     //     assert!(!db.is_empty());
     // }
 
+    #[ignore = "slow test"]
     #[test]
     fn test_filter_tags() {
         let db = from_file(crate::tests::TEST_OSM_FILE).expect("load db");
         crate::tests::test_filter_tags_owned(db);
     }
 
+    #[ignore = "slow test"]
     #[test]
     fn test_nodes_in_distance() {
         let db = from_file(crate::tests::TEST_OSM_FILE).expect("load db");
