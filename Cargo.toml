@@ -17,10 +17,33 @@ memmap = "0.7"
 tempfile = "3"
 bytes = "1"
 lru = "0.12"
+osmpbf = "0.3"
+itertools = "0.12"
+get-size = { version = "0.1", features = ["derive"] }
+log = "0.4"
+shapefile = "0.5"
+can2k-uom = { path = "../can2k/can2k-uom" }
+can2k-geo = { path = "../can2k/can2k-geo" }
+rayon = "1"
+tokio = { version = "1", features = ["rt-multi-thread", "sync", "parking_lot"] }
+async-scoped = { version = "0.9", features = ["use-tokio"] }
+async-recursion = "1"
+pretty-duration = "0.1"
 
 [dev-dependencies]
 criterion = "0.5"
 
+[lib]
+name = "rustonosmium"
+path = "src/lib.rs"
+
+[[bin]]
+name = "rustonosmium-cli"
+path = "src/bin.rs"
+
 [[bench]]
 name = "osm_benchmark"
 harness = false
+
+[profile.release]
+panic = 'abort'

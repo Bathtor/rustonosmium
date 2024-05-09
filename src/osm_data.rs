@@ -1,9 +1,10 @@
 //use rustc_hash::FxHashMap;
 use approx::*;
 use geographiclib_rs::{DirectGeodesic, Geodesic, InverseGeodesic};
+use get_size::GetSize;
 use std::{f64::consts::PI, fmt, num::ParseIntError, str::FromStr};
 use uom::si::{
-    angle::{degree, radian},
+    angle::degree,
     f64::*,
     length::{kilometer, meter},
 };
@@ -13,7 +14,7 @@ use uom::si::{
 //     <tag k="waterway" v="lock_gate"/>
 //   </node>
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, GetSize)]
 pub struct Node {
     pub id: i64,
     pub lat: Latitude,
@@ -189,7 +190,7 @@ impl AbsDiffEq for Position {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, GetSize)]
 pub enum Latitude {
     Decimal(i8, u32),
     Tight(i32),
@@ -250,7 +251,7 @@ impl Latitude {
             Latitude::Decimal(deg, frac) => {
                 Latitude::Tight((deg as i32) * (PRECISITION_FACTOR as i32) + (frac as i32))
             }
-            Latitude::Tight(mult) => self,
+            Latitude::Tight(_mult) => self,
             Latitude::Float(f) => Latitude::Tight((f * PRECISITION_FACTOR).round() as i32),
         }
     }
@@ -381,7 +382,7 @@ impl fmt::Display for Latitude {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, GetSize)]
 pub enum Longitude {
     Decimal(i16, u32),
     Tight(i32),
@@ -573,7 +574,7 @@ impl fmt::Display for Longitude {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, GetSize)]
 pub struct Tag {
     pub key: String,
     pub value: String,

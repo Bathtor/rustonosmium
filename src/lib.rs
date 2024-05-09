@@ -1,21 +1,28 @@
 #![feature(associated_type_defaults)]
+#![feature(async_closure)]
 #![allow(clippy::type_complexity)]
 use std::{error::Error, fmt, fs::File, io::BufReader, path::Path};
 
 pub mod databases;
 pub mod geometry;
 pub mod osm_data;
+pub mod osm_pbf;
 pub mod quick_xml_reader;
 pub mod xml_rs_reader;
 pub use databases::{OsmDatabase, OwnedOsmDatabase};
+pub mod shapefile_db;
+pub mod utils;
 
 const BUFFER_SIZE: usize = 80 * 1024 * 1024; // 80 MB
 
 #[derive(Debug)]
 pub enum ScanError {
     IOError(std::io::Error),
+    MissingNode,
     XmlReaderError(xml::reader::Error),
     QuickXmlError(quick_xml::Error),
+    OsmPbfError(osmpbf::Error),
+    ShapefileError(shapefile::Error),
     NumberParseError(std::num::ParseIntError),
     Other(String),
 }
@@ -30,8 +37,11 @@ impl Error for ScanError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
             ScanError::IOError(e) => Some(e),
+            ScanError::MissingNode => None,
             ScanError::XmlReaderError(e) => Some(e),
             ScanError::QuickXmlError(e) => Some(e),
+            ScanError::OsmPbfError(e) => Some(e),
+            ScanError::ShapefileError(e) => Some(e),
             ScanError::NumberParseError(e) => Some(e),
             ScanError::Other(_) => None,
         }
@@ -59,6 +69,16 @@ impl From<quick_xml::events::attributes::AttrError> for ScanError {
         ScanError::QuickXmlError(qx_error)
     }
 }
+impl From<osmpbf::Error> for ScanError {
+    fn from(e: osmpbf::Error) -> Self {
+        ScanError::OsmPbfError(e)
+    }
+}
+impl From<shapefile::Error> for ScanError {
+    fn from(e: shapefile::Error) -> Self {
+        ScanError::ShapefileError(e)
+    }
+}
 impl From<std::num::ParseIntError> for ScanError {
     fn from(e: std::num::ParseIntError) -> Self {
         ScanError::NumberParseError(e)
@@ -70,10 +90,11 @@ mod tests {
     use super::*;
 
     use osm_data::Position;
-    use std::time::Instant;
     use uom::si::{f64::*, length::kilometer};
 
     pub const TEST_OSM_FILE: &str = "/Users/lkroll/Programming/Sailing/test-data/world.osm";
+    pub const TEST_OSM_PBF_FILE: &str =
+        "/Users/lkroll/Programming/Sailing/test-data/9ab78e52-0358-4710-8150-17fb0899576c.osm.pbf";
 
     // #[test]
     // fn test_scan_nodes_xml_rs() {
