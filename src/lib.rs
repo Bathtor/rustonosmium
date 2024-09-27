@@ -1,9 +1,11 @@
 #![feature(associated_type_defaults)]
 #![feature(async_closure)]
 #![allow(clippy::type_complexity)]
+#![deny(unused_must_use)]
 use std::{error::Error, fmt, fs::File, io::BufReader, path::Path};
 
 pub mod databases;
+pub mod enc;
 pub mod geometry;
 pub mod osm_data;
 pub mod osm_pbf;
@@ -14,6 +16,15 @@ pub mod shapefile_db;
 pub mod utils;
 
 const BUFFER_SIZE: usize = 80 * 1024 * 1024; // 80 MB
+
+#[macro_export]
+macro_rules! fail {
+    ($context_selector:expr $(,)?) => {
+        return $context_selector
+            .fail()
+            .map_err(::core::convert::Into::into);
+    };
+}
 
 #[derive(Debug)]
 pub enum ScanError {

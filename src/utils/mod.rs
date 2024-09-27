@@ -22,6 +22,10 @@ where
     result_with_expensive_model: Option<Meters>,
 }
 
+// TODO: Deduplicate this with server backend code into a separate package.
+mod lazy_rw_lock;
+pub use lazy_rw_lock::*;
+
 // TODO: Continue this.q
 // impl<Cheap, Expensive> LazyDistance<Cheap, Expensive>
 // where
