@@ -1,7 +1,7 @@
-use snafu::ResultExt;
-
 use super::*;
 use crate::fail;
+use data_types::DataStructure;
+use snafu::ResultExt;
 
 /// Defines how to resolve the relationships between features of the chart.
 ///

@@ -1,3 +1,6 @@
+pub use can2k_uom::static_units::{angle::Degrees, length::Meter};
+use itertools::Itertools;
+use snafu::{prelude::*, Backtrace};
 use std::{
     collections::{BTreeMap, HashMap},
     fmt,
@@ -5,18 +8,15 @@ use std::{
     str::FromStr,
     sync::LazyLock,
 };
+
 pub mod data_types;
-use data_fields::RecordName;
-use data_types::*;
 mod reader;
-use itertools::Itertools;
-use reader::Generic8211FileReader;
+pub use reader::Generic8211FileReader;
 pub mod catalog_reader;
 pub mod chart_reader;
 pub mod data_fields;
-pub use can2k_uom::static_units::{angle::Degrees, length::Meter};
-pub use data_fields::DataField;
-use snafu::{prelude::*, Backtrace};
+pub mod dataset_reader;
+pub mod field_tree;
 
 const ATTRIBUTE_VALUE_LOOKUP_CSV: &'static str = include_str!("attribute_value_lookup.csv");
 const LABEL_VALUE_LOOKUP_CSV: &'static str = include_str!("label_value_lookup.csv");
@@ -212,8 +212,9 @@ fn parse_objects() -> BTreeMap<u16, ObjectClass> {
     let mut objects = BTreeMap::new();
     for entries in parse_csv(OBJECT_LOOKUP_CSV.lines().skip(1)).into_iter() {
         assert!(entries.len() == 8, "Wrong number of columns: {entries:#?}");
+        let code = entries[0].parse().unwrap();
         let value = ObjectClass {
-            code: entries[0].parse().unwrap(),
+            code,
             name: entries[1],
             acronym: entries[2],
             attributes_a: entries[3],
@@ -222,7 +223,13 @@ fn parse_objects() -> BTreeMap<u16, ObjectClass> {
             class: entries[6].chars().next().unwrap_or(' '),
             primitives: entries[7],
         };
-        objects.insert(value.code, value);
+        let existing = objects.insert(value.code, value);
+        assert!(
+            existing.is_none(),
+            "Duplicate object class value for code {} ({})",
+            code,
+            entries[0]
+        );
     }
     objects
 }
@@ -359,13 +366,6 @@ struct DecodingContext {
     lexical_level: LexicalLevel,
 }
 impl DecodingContext {
-    // This is wrong. This info comes from the DataDescriptiveField
-    // fn from_leader(leader: &Leader) -> Result<Self> {
-    //     let lexical_level =
-    //         LexicalLevel::for_character_set_indicator(leader.extended_character_set_indicator)?;
-    //     Ok(Self { lexical_level })
-    // }
-
     fn with_lexical_level(self, lexical_level: LexicalLevel) -> Self {
         Self {
             lexical_level,
@@ -591,7 +591,7 @@ pub enum EncError {
         "A record that was referenced as {pointer} could not be found during pointer resolution"
     ))]
     FailedLookup {
-        pointer: RecordName,
+        pointer: data_types::RecordName,
         backtrace: Backtrace,
     },
     #[snafu(display("Error converting slice into array: {source}"))]
@@ -645,7 +645,7 @@ impl EncError {
         // }
     }
 
-    fn pointer_lookup_failed(pointer: RecordName) -> Self {
+    fn pointer_lookup_failed(pointer: data_types::RecordName) -> Self {
         FailedLookupSnafu { pointer }.build()
     }
 }
@@ -747,7 +747,7 @@ trait EncReaderExt {
     fn read_string_until_field_terminator(&mut self, ctx: &DecodingContext) -> Result<String>;
     //fn read_string(&mut self, num_bytes: usize, ctx: &DecodingContext) -> Result<String>;
     fn read_ascii_string(&mut self, num_bytes: usize) -> Result<String>;
-    fn read_chars<const NUM: usize>(&mut self) -> Result<[char; NUM]>;
+    //fn read_chars<const NUM: usize>(&mut self) -> Result<[char; NUM]>;
     fn parse_number<N>(&mut self, num_bytes: usize) -> Result<N>
     where
         N: FromStr,
@@ -825,11 +825,11 @@ impl<R: BufRead> EncReaderExt for R {
         self.read_exact(&mut buffer)?;
         DDR_DECODING_CONTEXT.bytes_to_string(buffer)
     }
-    fn read_chars<const NUM: usize>(&mut self) -> Result<[char; NUM]> {
-        let mut buffer: [u8; NUM] = [0u8; NUM];
-        self.read_exact(&mut buffer)?;
-        Ok(buffer.map(char::from))
-    }
+    // fn read_chars<const NUM: usize>(&mut self) -> Result<[char; NUM]> {
+    //     let mut buffer: [u8; NUM] = [0u8; NUM];
+    //     self.read_exact(&mut buffer)?;
+    //     Ok(buffer.map(char::from))
+    // }
 
     fn parse_number<N>(&mut self, num_bytes: usize) -> Result<N>
     where
@@ -908,10 +908,23 @@ impl<R: BufRead> EncReaderExt for R {
 mod tests {
     use super::*;
 
+    pub(super) const TEST_DATA_ROOT: &str = "tests/data/S57";
+    pub(super) const TEST_DATA_SET: &str =
+        "tests/data/S57/20240816_U7Inland_Waddenzee_week 33_NL/ENC_ROOT";
+    pub(super) const TEST_CATALOG_FILE: &str =
+        "tests/data/S57/20240816_U7Inland_Waddenzee_week 33_NL/ENC_ROOT/catalog.031";
+    pub(super) const TEST_CHART_FILE: &str =
+        "tests/data/S57/20240816_U7Inland_Waddenzee_week 33_NL/ENC_ROOT/1R/7/1R7EMS01/1R7EMS01.000";
+    pub(super) const TEST_CHART_FILE2: &str =
+        "tests/data/S57/20240816_U7Inland_Waddenzee_week 33_NL/ENC_ROOT/1R/7/1R7EMS04/1R7EMS04.000";
+
     #[test]
     fn read_attribute_values() {
-        println!("Raw: {ATTRIBUTE_VALUE_LOOKUP_CSV}");
-        println!("Parsed: {:#?}", *ATTRIBUTE_VALUE_LOOKUP);
+        // println!("Raw: {ATTRIBUTE_VALUE_LOOKUP_CSV}");
+        // println!("Parsed: {:#?}", *ATTRIBUTE_VALUE_LOOKUP);
+        assert_eq!((*ATTRIBUTE_VALUE_LOOKUP).len(), 124);
+        assert_eq!((*LABEL_VALUE_LOOKUP).len(), 309);
+        assert_eq!((*OBJECT_LOOKUP).len(), 250);
     }
 
     #[test]

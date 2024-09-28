@@ -1,7 +1,8 @@
-use crate::fail;
-
 use super::*;
-use data_fields::CatalogDirectoryField;
+use crate::fail;
+use chart_reader::ChartReader;
+use data_fields::{CatalogDirectoryField, DataField};
+use data_types::S57Implementation;
 use itertools::Itertools;
 use std::{
     ffi::OsStr,
@@ -112,19 +113,24 @@ impl CatalogFile {
             comment: value.comment,
         }
     }
+
+    /// Open a chart reader for this file.
+    ///
+    /// Will error if this is not a chart file.
+    pub fn chart_reader(&self) -> Result<ChartReader> {
+        ChartReader::with(Generic8211FileReader::open(&self.path)?)
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    const TEST_DIRECTORY_FILE: &str = "/Users/lkroll/Programming/Sailing/test-data/20240816_U7Inland_Waddenzee_week 33_NL/ENC_ROOT/catalog.031";
-    const TEST_CHART_FILE: &str = "/Users/lkroll/Programming/Sailing/test-data/20240816_U7Inland_Waddenzee_week 33_NL/ENC_ROOT/1R/7/1R7EMS01/1R7EMS01.000";
-
     #[test]
     fn read_directory() {
-        println!("Path: {TEST_DIRECTORY_FILE}");
-        let generic_reader = Generic8211FileReader::open(TEST_DIRECTORY_FILE).unwrap();
+        let path = crate::enc::tests::TEST_CATALOG_FILE;
+        println!("Path: {path}");
+        let generic_reader = Generic8211FileReader::open(path).unwrap();
         let catalog_reader = CatalogReader::with(generic_reader).unwrap();
         let mut num_files: usize = 0;
         for file in catalog_reader.files_in_catalog().unwrap() {
@@ -143,7 +149,9 @@ mod tests {
 
     #[test]
     fn fail_on_wrong_file_type() {
-        let generic_reader = Generic8211FileReader::open(TEST_CHART_FILE).unwrap();
+        let path = crate::enc::tests::TEST_CHART_FILE;
+        println!("Path: {path}");
+        let generic_reader = Generic8211FileReader::open(path).unwrap();
         let catalog_reader_res = CatalogReader::with(generic_reader);
         assert!(
             catalog_reader_res.is_err(),

@@ -1,135 +1,8 @@
 use super::*;
 use byteorder::{ReadBytesExt, LE};
+use data_types::*;
 use reader::{DataDescriptiveField, DirectoryEntry};
 use std::marker::PhantomData;
-
-// struct RecordNameLookup {
-//     entries: [RecordNameLookupEntry; 14],
-//     binary_id_map: BTreeMap<u8, &'static RecordNameLookupEntry>,
-
-// }
-
-struct RecordNameLookupEntry {
-    binary_id: u8,
-    ascii_code: [char; 2],
-    name: &'static str,
-}
-
-const RECORD_NAMES: [RecordNameLookupEntry; 14] = [
-    RecordNameLookupEntry {
-        binary_id: 10,
-        ascii_code: ['D', 'S'],
-        name: "Data Set General Information",
-    },
-    RecordNameLookupEntry {
-        binary_id: 20,
-        ascii_code: ['D', 'P'],
-        name: "Data Set Geographic Reference",
-    },
-    RecordNameLookupEntry {
-        binary_id: 30,
-        ascii_code: ['D', 'H'],
-        name: "Data Set History",
-    },
-    RecordNameLookupEntry {
-        binary_id: 40,
-        ascii_code: ['D', 'A'],
-        name: "Data Set Accuracy",
-    },
-    RecordNameLookupEntry {
-        binary_id: 50, // This is actually not allowed, but happens to be free.
-        ascii_code: ['C', 'D'],
-        name: "Catalogue Directory",
-    },
-    RecordNameLookupEntry {
-        binary_id: 60,
-        ascii_code: ['C', 'R'],
-        name: "Catalogue Cross Reference",
-    },
-    RecordNameLookupEntry {
-        binary_id: 70,
-        ascii_code: ['I', 'D'],
-        name: "Data Dictionary Definition",
-    },
-    RecordNameLookupEntry {
-        binary_id: 80,
-        ascii_code: ['I', 'O'],
-        name: "Data Dictionary Domain",
-    },
-    RecordNameLookupEntry {
-        binary_id: 90,
-        ascii_code: ['I', 'S'],
-        name: "Data Dictionary Schema",
-    },
-    RecordNameLookupEntry {
-        binary_id: 100,
-        ascii_code: ['F', 'E'],
-        name: "Feature",
-    },
-    RecordNameLookupEntry {
-        binary_id: 110,
-        ascii_code: ['V', 'I'],
-        name: "Vector Isolated Node",
-    },
-    RecordNameLookupEntry {
-        binary_id: 120,
-        ascii_code: ['V', 'C'],
-        name: "Vector Connected Node",
-    },
-    RecordNameLookupEntry {
-        binary_id: 130,
-        ascii_code: ['V', 'E'],
-        name: "Vector Edge",
-    },
-    RecordNameLookupEntry {
-        binary_id: 140,
-        ascii_code: ['V', 'F'],
-        name: "Vector Face",
-    },
-];
-
-static RECORD_NAME_LOOKUP_BY_ID: LazyLock<BTreeMap<u8, &'static RecordNameLookupEntry>> =
-    LazyLock::new(|| {
-        RECORD_NAMES
-            .iter()
-            .map(|entry| (entry.binary_id, entry))
-            .collect()
-    });
-
-/// A 5 byte unique "NAME" for a record.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct RecordName {
-    pub name: u8,
-    pub identifier: u32,
-}
-impl RecordName {
-    pub fn ascii_name(&self) -> &'static [char; 2] {
-        &(*RECORD_NAME_LOOKUP_BY_ID)
-            .get(&self.name)
-            .expect("record name should exist")
-            .ascii_code
-    }
-}
-impl FromFixedLengthBytes for RecordName {
-    const LENGTH: usize = 5;
-
-    fn from_bytes_unchecked(data: &[u8]) -> Result<Self>
-    where
-        Self: Sized,
-    {
-        let name = Self {
-            name: data[0],
-            identifier: u32::from_le_bytes(data[1..].try_into().context(SlicingSnafu)?),
-        };
-        Ok(name)
-    }
-}
-impl fmt::Display for RecordName {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let ascii_name = self.ascii_name();
-        write!(f, "{}{}{}", ascii_name[0], ascii_name[1], self.identifier)
-    }
-}
 
 /// Records can be identified by a 5 byte unique "NAME" within each file/exchange set.
 pub trait Record {
@@ -219,6 +92,7 @@ pub(super) enum DataFieldReaderType {
     FeatureToSpatialRecordPointerArray,
     FeatureToObjectPointerArray,
     FeatureRecordAttributeArray(AttributeLabelDomain),
+    VectorRecordAttributeArray,
     Fallback,
 }
 impl DataFieldReaderType {
@@ -395,6 +269,17 @@ impl DataFieldReaderType {
                 );
                 Self::FeatureRecordAttributeArray(AttributeLabelDomain::National)
             }
+            ValueArrayTerminatedReaderBinaryReader::<VectorRecordAttributeBinaryReader>::TAG => {
+                assert_eq!(
+                    descriptor.format_controls,
+                    ValueArrayTerminatedReaderBinaryReader::<VectorRecordAttributeBinaryReader>::FORMAT
+                );
+                assert_eq!(
+                    descriptor.array_descriptor,
+                    ValueArrayTerminatedReaderBinaryReader::<VectorRecordAttributeBinaryReader>::DESCRIPTOR
+                );
+                Self::VectorRecordAttributeArray
+            }
             _ => Self::Fallback,
         }
     }
@@ -477,6 +362,7 @@ impl DataFieldReaderType {
                     FeatureRecordAttributeGeneralBinaryReader,
                 >::new(
                     FeatureRecordAttributeGeneralBinaryReader::new(ctx.clone()),
+                    entry.length,
                     ctx,
                 );
                 value_reader.read_from_reader(reader)
@@ -486,6 +372,17 @@ impl DataFieldReaderType {
                     FeatureRecordAttributeNationalBinaryReader,
                 >::new(
                     FeatureRecordAttributeNationalBinaryReader::new(ctx.clone()),
+                    entry.length,
+                    ctx,
+                );
+                value_reader.read_from_reader(reader)
+            }
+            Self::VectorRecordAttributeArray => {
+                let value_reader = ValueArrayTerminatedReaderBinaryReader::<
+                    VectorRecordAttributeBinaryReader,
+                >::new(
+                    VectorRecordAttributeBinaryReader::new(ctx.clone()),
+                    entry.length,
                     ctx,
                 );
                 value_reader.read_from_reader(reader)
@@ -639,56 +536,6 @@ impl ByteReader for RecordIdentifierBinaryReader {
         Ok(DataField::RecordIdentifier { id })
     }
 }
-// const RECORD_IDENTIFIER_BINARY_FIELD_READER: RecordIdentifierBinaryReader =
-//   RecordIdentifierBinaryReader;
-
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub enum ProductSpecification {
-    /// ENC
-    ElectronicNavigationalChart,
-    /// ODD
-    ObjectCatalogueDataDictionary,
-    UnknownBytes(u8),
-    UnknownStr(String),
-}
-impl FromBytes for ProductSpecification {
-    fn from_reader<R>(reader: &mut R) -> Result<Self>
-    where
-        R: BufRead + Seek,
-        Self: Sized,
-    {
-        match reader.read_u8()? {
-            1 => Ok(Self::ElectronicNavigationalChart),
-            2 => Ok(Self::ObjectCatalogueDataDictionary),
-            b => Ok(Self::UnknownBytes(b)),
-        }
-    }
-}
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub enum ApplicationProfileId {
-    /// EN - ENC New
-    EncNew,
-    /// ER - ENC Revision
-    EncRevision,
-    /// DD - IHO Data dictionary
-    DataDictionary,
-    UnknownBytes(u8),
-    UnknownStr(String),
-}
-impl FromBytes for ApplicationProfileId {
-    fn from_reader<R>(reader: &mut R) -> Result<Self>
-    where
-        R: BufRead + Seek,
-        Self: Sized,
-    {
-        match reader.read_u8()? {
-            1 => Ok(Self::EncNew),
-            2 => Ok(Self::EncRevision),
-            3 => Ok(Self::DataDictionary),
-            b => Ok(Self::UnknownBytes(b)),
-        }
-    }
-}
 
 #[derive(Clone, Debug)]
 pub struct DataSetIdentificationField {
@@ -770,38 +617,6 @@ impl ByteReader for DataSetIdentificationFieldBinaryReader {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub enum DataStructure {
-    /// CS - Cartographic sphaghetti
-    CartographicSpaghetti,
-    /// CN - Chain-node
-    ChainNode,
-    /// PG - Planar graph
-    PlanarGraph,
-    /// FT - Full topology
-    FullTopology,
-    /// NO - Topology is not relevant
-    Irrelevant,
-    UnknownBytes(u8),
-    UnknownStr(String),
-}
-impl FromBytes for DataStructure {
-    fn from_reader<R>(reader: &mut R) -> Result<Self>
-    where
-        R: BufRead + Seek,
-        Self: Sized,
-    {
-        match reader.read_u8()? {
-            1 => Ok(Self::CartographicSpaghetti),
-            2 => Ok(Self::ChainNode),
-            3 => Ok(Self::PlanarGraph),
-            4 => Ok(Self::FullTopology),
-            255 => Ok(Self::Irrelevant),
-            b => Ok(Self::UnknownBytes(b)),
-        }
-    }
-}
-
 #[derive(Clone, Debug)]
 pub struct DataSetStructureInformation {
     pub data_structure: DataStructure,
@@ -855,41 +670,6 @@ impl ByteReader for DataSetStructureInformationBinaryReader {
         };
         reader.expect_field_terminator(&self.ctx)?;
         Ok(DataField::DataStructure(Box::new(field)))
-    }
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub enum CoordinateUnits {
-    /// LL - Latitude/Longitude
-    LatitudeLongitude,
-    /// EN - Easting/Northing
-    EastingNorthing,
-    /// UC - Units on the chart
-    UnitsOnTheChart,
-    UnknownBytes(u8),
-    UnknownStr(String),
-}
-impl CoordinateUnits {
-    pub(super) fn scaling_factor_to_degrees(&self, multiplier: u32) -> f64 {
-        match self {
-            // This is always specified in degrees.
-            Self::LatitudeLongitude => 1.0 / (multiplier as f64),
-            _ => unimplemented!("{:?} coordinate unit is not supported", self),
-        }
-    }
-}
-impl FromBytes for CoordinateUnits {
-    fn from_reader<R>(reader: &mut R) -> Result<Self>
-    where
-        R: BufRead + Seek,
-        Self: Sized,
-    {
-        match reader.read_u8()? {
-            1 => Ok(Self::LatitudeLongitude),
-            2 => Ok(Self::EastingNorthing),
-            3 => Ok(Self::UnitsOnTheChart),
-            b => Ok(Self::UnknownBytes(b)),
-        }
     }
 }
 
@@ -964,39 +744,6 @@ impl ByteReader for DataSetParameterFieldBinaryReader {
         };
         reader.expect_field_terminator(&self.ctx)?;
         Ok(DataField::DataSetParameter(Box::new(field)))
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum UpdateInstruction {
-    Insert,
-    Delete,
-    Modify,
-}
-impl FromBytes for UpdateInstruction {
-    fn from_reader<R>(reader: &mut R) -> Result<Self>
-    where
-        R: BufRead + Seek,
-        Self: Sized,
-    {
-        match reader.read_u8()? {
-            1 => Ok(Self::Insert),
-            2 => Ok(Self::Delete),
-            3 => Ok(Self::Modify),
-            b => FormatViolationSnafu {
-                description: format!("Expected update instruction in {{1, 2, 3}} but got {b}"),
-            }
-            .fail(),
-        }
-    }
-}
-impl fmt::Display for UpdateInstruction {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Insert => write!(f, "INSERT"),
-            Self::Delete => write!(f, "DELETE"),
-            Self::Modify => write!(f, "MODIFY"),
-        }
     }
 }
 
@@ -1175,14 +922,19 @@ where
     R: TerminatedValueReader + ByteReader,
 {
     value_reader: R,
+    expected_size: usize,
     ctx: DecodingContext,
 }
 impl<R> ValueArrayTerminatedReaderBinaryReader<R>
 where
     R: TerminatedValueReader + ByteReader,
 {
-    fn new(value_reader: R, ctx: DecodingContext) -> Self {
-        Self { value_reader, ctx }
+    fn new(value_reader: R, expected_size: usize, ctx: DecodingContext) -> Self {
+        Self {
+            value_reader,
+            expected_size,
+            ctx,
+        }
     }
 }
 impl<R> FieldReader for ValueArrayTerminatedReaderBinaryReader<R>
@@ -1207,7 +959,22 @@ where
         Self: Sized,
     {
         let mut data = Vec::new();
-        while !reader.peek_is_field_terminator(&self.ctx)? {
+        let start_pos = reader.stream_position()?;
+        'value_reading: loop {
+            if reader.peek_is_field_terminator(&self.ctx)? {
+                let current_pos = reader.stream_position()?;
+                if current_pos + 1 == start_pos + self.expected_size as u64 {
+                    break 'value_reading;
+                }
+                assert!(
+                    current_pos + 1 < start_pos + self.expected_size as u64,
+                    "We read too far. Current={}, expected end={}",
+                    current_pos,
+                    start_pos + self.expected_size as u64
+                );
+                // Otherwise we keep reading despite the terminator character,
+                // because it may be part of a value (e.g. the next u16).
+            }
             let value = self.value_reader.read_from_reader(reader)?;
             data.push(value);
         }
@@ -1325,87 +1092,6 @@ impl FromFixedLengthBytes for Coordinate2D {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum Orientation {
-    Forward,
-    Reverse,
-}
-impl FromByteOpt for Orientation {
-    fn from_byte(value: u8) -> Result<Self> {
-        match value {
-            1 => Ok(Self::Forward),
-            2 => Ok(Self::Reverse),
-            x => FormatViolationSnafu {
-                description: format!("Invalid value {x} for {}", std::any::type_name::<Self>()),
-            }
-            .fail(),
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum UsageIndicator {
-    Exterior,
-    Interior,
-    /// Exterior boundary truncated by the data limit.
-    ExteriorTruncated,
-}
-impl FromByteOpt for UsageIndicator {
-    fn from_byte(value: u8) -> Result<Self> {
-        match value {
-            1 => Ok(Self::Exterior),
-            2 => Ok(Self::Interior),
-            3 => Ok(Self::ExteriorTruncated),
-            x => FormatViolationSnafu {
-                description: format!("Invalid value {x} for {}", std::any::type_name::<Self>()),
-            }
-            .fail(),
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum TopologyIndicator {
-    BeginningNode,
-    EndNode,
-    LeftFace,
-    RightFace,
-    ContainingFace,
-}
-impl FromByteOpt for TopologyIndicator {
-    fn from_byte(value: u8) -> Result<Self> {
-        match value {
-            1 => Ok(Self::BeginningNode),
-            2 => Ok(Self::EndNode),
-            3 => Ok(Self::LeftFace),
-            4 => Ok(Self::RightFace),
-            5 => Ok(Self::ContainingFace),
-            x => FormatViolationSnafu {
-                description: format!("Invalid value {x} for {}", std::any::type_name::<Self>()),
-            }
-            .fail(),
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum MaskingIndicator {
-    Mask,
-    Show,
-}
-impl FromByteOpt for MaskingIndicator {
-    fn from_byte(value: u8) -> Result<Self> {
-        match value {
-            1 => Ok(Self::Mask),
-            2 => Ok(Self::Show),
-            x => FormatViolationSnafu {
-                description: format!("Invalid value {x} for {}", std::any::type_name::<Self>()),
-            }
-            .fail(),
-        }
-    }
-}
-
 #[derive(Clone, Debug, PartialEq)]
 pub struct VectorRecordPointer {
     pub name: RecordName,
@@ -1484,38 +1170,6 @@ impl FromBytes for FeatureRecordToSpatialRecordPointer {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub enum RelationshipIndicator {
-    Master,
-    Slave,
-    Peer,
-    Other(u8),
-}
-impl fmt::Display for RelationshipIndicator {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Master => write!(f, "Master"),
-            Self::Slave => write!(f, "Slave"),
-            Self::Peer => write!(f, "Peer"),
-            Self::Other(_) => write!(f, "?"),
-        }
-    }
-}
-impl FromBytes for RelationshipIndicator {
-    fn from_reader<R>(reader: &mut R) -> Result<Self>
-    where
-        R: BufRead + Seek,
-        Self: Sized,
-    {
-        match reader.read_u8()? {
-            1 => Ok(Self::Master),
-            2 => Ok(Self::Slave),
-            3 => Ok(Self::Peer),
-            b => Ok(Self::Other(b)),
-        }
-    }
-}
-
 #[derive(Clone, Debug)]
 pub struct FeatureRecordToFeatureObjectPointer {
     pub name: LongRecordName,
@@ -1558,26 +1212,6 @@ impl FromBytes for FeatureRecordToFeatureObjectPointer {
             comment: reader.read_string_until_unit_terminator(&DDR_DECODING_CONTEXT)?,
         };
         Ok(value)
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum ObjectGeometricPrimitive {
-    Point,
-    Line,
-    Area,
-}
-impl FromByteOpt for ObjectGeometricPrimitive {
-    fn from_byte(value: u8) -> Result<Self> {
-        match value {
-            1 => Ok(Self::Point),
-            2 => Ok(Self::Line),
-            3 => Ok(Self::Area),
-            x => FormatViolationSnafu {
-                description: format!("Invalid value {x} for {}", std::any::type_name::<Self>()),
-            }
-            .fail(),
-        }
     }
 }
 
@@ -1644,39 +1278,6 @@ impl ByteReaderWithKnownSize for FeatureRecordIdBinaryFieldReader {
     }
 }
 
-#[derive(Clone, Debug)]
-pub struct LongRecordName {
-    pub producing_agency: u16,
-    pub feature_identification_number: u32,
-    pub feature_identification_subdivision: u16,
-}
-impl FromFixedLengthBytes for LongRecordName {
-    const LENGTH: usize = 8;
-
-    fn from_bytes_unchecked(mut data: &[u8]) -> Result<Self>
-    where
-        Self: Sized,
-    {
-        let name = Self {
-            producing_agency: data.read_u16::<LE>()?,
-            feature_identification_number: data.read_u32::<LE>()?,
-            feature_identification_subdivision: data.read_u16::<LE>()?,
-        };
-        Ok(name)
-    }
-}
-impl fmt::Display for LongRecordName {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "{}:{}.{}",
-            self.producing_agency,
-            self.feature_identification_number,
-            self.feature_identification_subdivision
-        )
-    }
-}
-
 // They have identical structure.
 pub type FeatureObjectIdField = LongRecordName;
 struct FeatureObjectIdFieldBinaryReader {
@@ -1709,12 +1310,6 @@ impl ByteReaderWithKnownSize for FeatureObjectIdFieldBinaryReader {
         (&data[8..]).expect_field_terminator(&self.ctx)?;
         Ok(DataField::FeatureObjectId(value))
     }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum AttributeLabelDomain {
-    General,
-    National,
 }
 
 #[derive(Clone, Debug)]
@@ -1813,6 +1408,13 @@ impl ByteReader for FeatureRecordAttributeNationalBinaryReader {
 /// applies to vector records.
 struct VectorRecordAttributeBinaryReader {
     general_reader: FeatureRecordAttributeGeneralBinaryReader,
+}
+impl VectorRecordAttributeBinaryReader {
+    fn new(ctx: DecodingContext) -> Self {
+        Self {
+            general_reader: FeatureRecordAttributeGeneralBinaryReader::new(ctx),
+        }
+    }
 }
 impl TerminatedValueReader for VectorRecordAttributeBinaryReader {
     const TAG: &'static str = "ATTV";
